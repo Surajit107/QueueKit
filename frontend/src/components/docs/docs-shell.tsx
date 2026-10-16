@@ -1,0 +1,35 @@
+import * as React from 'react'
+
+import { DocsNav } from '@/components/docs/docs-nav'
+import { SectionHead } from '@/components/section-head'
+import { Highlight } from '@/components/ui/highlight'
+
+export function DocsShell({
+  title,
+  lead,
+  highlight,
+  children,
+}: {
+  title: string
+  lead: string
+  highlight: string
+  children: React.ReactNode
+}) {
+  const [before, after] = lead.split(highlight)
+
+  return (
+    <div className="flex flex-col gap-8">
+      <div className="flex flex-col gap-4">
+        <SectionHead title={title}>
+          <span suppressHydrationWarning>
+            {before}
+            <Highlight>{highlight}</Highlight>
+            {after}
+          </span>
+        </SectionHead>
+        <DocsNav />
+      </div>
+      {children}
+    </div>
+  )
+}

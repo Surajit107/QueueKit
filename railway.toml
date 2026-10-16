@@ -1,0 +1,13 @@
+# Deploy the API from the monorepo root so `packages/*` resolve.
+# Railway service settings:
+#   Root Directory: /   (repo root — do NOT set to backend/)
+#   Watch Paths (optional): backend/**, packages/**
+
+[build]
+builder = "NIXPACKS"
+buildCommand = "npm ci && npm run build:backend"
+
+[deploy]
+startCommand = "npm run start:backend"
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5

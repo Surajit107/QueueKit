@@ -1,0 +1,53 @@
+{
+  "name": "@queuekit/api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "QueueKit API — Express + Redis + BullMQ demo backend",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch --env-file=.env src/index.ts",
+    "start": "tsx --env-file=.env src/index.ts",
+    "start:prod": "node dist/index.js",
+    "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json && node scripts/copy-assets.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:unit": "vitest run tests/unit",
+    "test:health": "vitest run tests/healthcheck.test.ts"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@queuekit/queue-toolkit": "*",
+    "@queuekit/redis-toolkit": "*",
+    "@queuekit/shared": "*",
+    "bullmq": "^5.41.0",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "express-rate-limit": "^7.5.0",
+    "ioredis": "^5.4.2",
+    "morgan": "^1.10.0",
+    "request-ip": "^3.1.0",
+    "swagger-ui-express": "^5.0.1",
+    "winston": "^3.17.0",
+    "yaml": "^2.7.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/morgan": "^1.9.9",
+    "@types/node": "^22.13.10",
+    "@types/request-ip": "^0.0.41",
+    "@types/supertest": "^6.0.2",
+    "@types/swagger-ui-express": "^4.1.8",
+    "supertest": "^7.0.0",
+    "tsc-alias": "^1.8.11",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.8"
+  }
+}

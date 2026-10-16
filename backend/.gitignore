@@ -1,0 +1,30 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Coverage
+coverage
+*.lcov
+
+# Dependencies
+node_modules/
+
+# TypeScript / build
+*.tsbuildinfo
+dist/
+
+# Env
+.env
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
+
+# IDE / OS
+.vscode
+.idea
+.DS_Store
+
+# Test artifacts
+/test-results/

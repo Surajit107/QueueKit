@@ -1,0 +1,495 @@
+openapi: 3.0.3
+info:
+  title: QueueKit API
+  version: 0.1.0
+  description: |
+    Redis + BullMQ learning playground API.
+
+    ## Free-tier / ephemeral behavior
+
+    This is a **learning demo**, not production infrastructure:
+
+    - Services may **sleep** on free hosts; the first request after idle can be slow (cold start).
+    - Redis data and BullMQ jobs may **disappear** after restarts when storage is ephemeral.
+    - Worker processing only runs while the API process is awake (`RUN_WORKER=true` on free tier).
+    - Status values may be `unknown` or `offline` — clients must not invent "healthy".
+    - Job durability and message persistence are **not** guaranteed.
+
+    ## Safety
+
+    - No arbitrary Redis commands / CLI / eval forwarders.
+    - Only allowlisted demo keys, queues, and job types are accepted.
+    - Destructive reset requires `confirm: true` and targets the demo namespace only.
+    - Per-IP rate limits apply globally; job enqueue and demo reset have tighter caps.
+    - Error responses never include stacks, Redis URLs, or credentials.
+
+    ## Live updates
+
+    Prefer `GET /api/v1/events` (SSE). If SSE drops, poll
+    `GET /api/v1/queues/{queue}/jobs`, `GET /api/v1/queues/{queue}/metrics`,
+    and `GET /api/v1/status`.
+servers:
+  - url: ${{server}}
+tags:
+  - name: Status
+  - name: Redis Demo
+  - name: Queues
+  - name: Events
+  - name: Demo Reset
+  - name: Safety
+paths:
+  /redis/command:
+    post:
+      tags: [Safety]
+      summary: Not available — arbitrary Redis commands are rejected
+      description: Intentionally unimplemented. Returns 404.
+      responses:
+        "404":
+          description: Arbitrary Redis commands are not exposed
+  /redis/raw:
+    post:
+      tags: [Safety]
+      summary: Not available — Redis raw forwarder rejected
+      responses:
+        "404":
+          description: Arbitrary Redis commands are not exposed
+  /status:
+    get:
+      tags: [Status]
+      summary: API, Redis, and worker status
+      description: Never fabricates healthy values. Includes free-tier notes.
+      responses:
+        "200":
+          description: Honest system status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusResponse"
+
+  /redis/demo/keys:
+    get:
+      tags: [Redis Demo]
+      summary: List allowlisted demo keys
+      responses:
+        "200":
+          description: Key list (namespaced suffixes)
+        "503":
+          description: Redis unavailable
+    post:
+      tags: [Redis Demo]
+      summary: Create or update a demo key
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDemoKeyRequest"
+      responses:
+        "201":
+          description: Key created
+        "400":
+          description: Validation failed
+        "503":
+          description: Redis unavailable
+
+  /redis/demo/keys/{key}:
+    get:
+      tags: [Redis Demo]
+      summary: Read a namespaced demo key
+      parameters:
+        - $ref: "#/components/parameters/DemoKey"
+      responses:
+        "200":
+          description: Key value + TTL
+        "404":
+          description: Key not found
+        "503":
+          description: Redis unavailable
+    delete:
+      tags: [Redis Demo]
+      summary: Delete a demo key
+      parameters:
+        - $ref: "#/components/parameters/DemoKey"
+      responses:
+        "200":
+          description: Key deleted
+        "503":
+          description: Redis unavailable
+
+  /redis/demo/cache:
+    post:
+      tags: [Redis Demo]
+      summary: Cache-aside demonstration
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                forceMiss:
+                  type: boolean
+      responses:
+        "200":
+          description: Cache hit or miss result with demo metrics
+        "503":
+          description: Redis unavailable
+
+  /redis/demo/rate-limit:
+    post:
+      tags: [Redis Demo]
+      summary: Sliding-window rate-limit demonstration
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                bucket:
+                  type: string
+                limit:
+                  type: integer
+                windowMs:
+                  type: integer
+      responses:
+        "200":
+          description: Request allowed under demo quota
+        "429":
+          description: Demo rate limit exceeded
+        "503":
+          description: Redis unavailable
+
+  /redis/demo/counter:
+    post:
+      tags: [Redis Demo]
+      summary: Atomic counter demonstration (INCR / DECR / GET)
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                op:
+                  type: string
+                  enum: [incr, decr, get]
+                by:
+                  type: integer
+                  minimum: 1
+                  maximum: 1000
+      responses:
+        "200":
+          description: Counter value after operation
+        "503":
+          description: Redis unavailable
+
+  /redis/demo/structures:
+    post:
+      tags: [Redis Demo]
+      summary: Bounded hash / list / set / zset demonstration
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind, key]
+              properties:
+                kind:
+                  type: string
+                  enum: [hash, list, set, zset]
+                key:
+                  type: string
+                field:
+                  type: string
+                value:
+                  type: string
+                member:
+                  type: string
+                score:
+                  type: number
+      responses:
+        "200":
+          description: Structure state after bounded write
+        "400":
+          description: Validation failed
+        "503":
+          description: Redis unavailable
+
+  /redis/demo/pubsub/channels:
+    get:
+      tags: [Redis Demo]
+      summary: List allowlisted demo Pub/Sub channels and durability limitations
+      responses:
+        "200":
+          description: Allowlisted channels (lobby, lab) plus honesty notes
+
+  /redis/demo/pubsub/publish:
+    post:
+      tags: [Redis Demo]
+      summary: Publish a message on an allowlisted Redis Pub/Sub channel
+      description: |
+        Uses Redis PUBLISH on a namespaced channel. Fire-and-forget —
+        if subscribers is 0, the message was discarded. Not a queue.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [channel, message]
+              properties:
+                channel:
+                  type: string
+                  enum: [lobby, lab]
+                message:
+                  type: string
+                  maxLength: 256
+      responses:
+        "200":
+          description: Published; body includes Redis subscriber count
+        "400":
+          description: Validation failed
+        "429":
+          description: Publish rate limit exceeded
+        "503":
+          description: Redis unavailable
+
+  /redis/demo/pubsub/events:
+    get:
+      tags: [Redis Demo]
+      summary: SSE stream of Redis Pub/Sub messages (dedicated subscriber connection)
+      description: |
+        Bridges real Redis SUBSCRIBE (process-level duplicate connection) to SSE.
+        Query channels=lobby,lab (default all allowlisted). Messages are not durable.
+      parameters:
+        - in: query
+          name: channels
+          schema:
+            type: string
+          description: Comma-separated allowlisted channels (default all)
+      responses:
+        "200":
+          description: text/event-stream of redis.pubsub.message events
+        "400":
+          description: Invalid channel list
+        "429":
+          description: Too many concurrent Pub/Sub listeners
+        "503":
+          description: Redis unavailable
+
+  /queues/{queue}/jobs:
+    post:
+      tags: [Queues]
+      summary: Enqueue an allowlisted demo job
+      parameters:
+        - $ref: "#/components/parameters/DemoQueue"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnqueueJobRequest"
+      responses:
+        "201":
+          description: Job enqueued
+        "400":
+          description: Validation failed / queue not allowlisted
+        "503":
+          description: Queue infrastructure unavailable
+    get:
+      tags: [Queues]
+      summary: List recent demo jobs
+      parameters:
+        - $ref: "#/components/parameters/DemoQueue"
+        - name: start
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+        - name: end
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+      responses:
+        "200":
+          description: Recent jobs (bounded)
+        "400":
+          description: Queue not allowlisted
+        "503":
+          description: Queue infrastructure unavailable
+
+  /queues/{queue}/jobs/{jobId}:
+    get:
+      tags: [Queues]
+      summary: Inspect a demo job
+      parameters:
+        - $ref: "#/components/parameters/DemoQueue"
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Job detail
+        "404":
+          description: Job not found
+        "503":
+          description: Queue infrastructure unavailable
+
+  /queues/{queue}/metrics:
+    get:
+      tags: [Queues]
+      summary: Queue counts and available metrics
+      parameters:
+        - $ref: "#/components/parameters/DemoQueue"
+      responses:
+        "200":
+          description: Queue metrics
+        "503":
+          description: Queue infrastructure unavailable
+
+  /events:
+    get:
+      tags: [Events]
+      summary: SSE stream for allowlisted demo events
+      description: |
+        Server-Sent Events for `job.waiting`, `job.active`, `job.completed`,
+        `job.failed`, and `redis.key.changed`.
+
+        Query `types` to filter (comma-separated). Defaults to all allowlisted types.
+
+        **Polling fallback** when SSE is blocked or drops:
+        - `GET /api/v1/queues/{queue}/jobs`
+        - `GET /api/v1/queues/{queue}/metrics`
+        - `GET /api/v1/status`
+      parameters:
+        - name: types
+          in: query
+          required: false
+          schema:
+            type: string
+            example: job.completed,job.failed
+      responses:
+        "200":
+          description: text/event-stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "400":
+          description: Unsupported event type filter
+
+  /demo/reset:
+    post:
+      tags: [Demo Reset]
+      summary: Reset namespaced demo Redis keys and allowlisted queues
+      description: "Requires confirm=true. Targets demo namespace only."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [confirm]
+              properties:
+                confirm:
+                  type: boolean
+                  enum: [true]
+      responses:
+        "200":
+          description: Demo resources reset
+        "400":
+          description: Confirmation required
+        "503":
+          description: Redis unavailable
+
+components:
+  parameters:
+    DemoKey:
+      name: key
+      in: path
+      required: true
+      schema:
+        type: string
+        maxLength: 64
+    DemoQueue:
+      name: queue
+      in: path
+      required: true
+      schema:
+        type: string
+        enum: [queuekit-demo]
+
+  schemas:
+    ApiEnvelope:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+        success:
+          type: boolean
+        message:
+          type: string
+        data: {}
+
+    StatusResponse:
+      allOf:
+        - $ref: "#/components/schemas/ApiEnvelope"
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                api:
+                  type: string
+                  enum: [ok]
+                redis:
+                  type: string
+                  enum: [connected, disconnected, unknown, offline]
+                worker:
+                  type: string
+                  enum: [active, unknown, offline]
+                workerHeartbeatAt:
+                  type: string
+                  nullable: true
+                notes:
+                  type: array
+                  items:
+                    type: string
+
+    CreateDemoKeyRequest:
+      type: object
+      required: [key, value]
+      properties:
+        key:
+          type: string
+          maxLength: 64
+        value:
+          type: string
+          maxLength: 1024
+        ttlSeconds:
+          type: integer
+          maximum: 86400
+
+    EnqueueJobRequest:
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [echo, delay, fail]
+        payload:
+          type: object
+          additionalProperties: true
+        delayMs:
+          type: integer
+          minimum: 0
+          maximum: 60000
+        priority:
+          type: integer
+          minimum: 1
+          maximum: 10

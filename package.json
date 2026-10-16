@@ -1,0 +1,34 @@
+{
+  "name": "queuekit",
+  "version": "0.1.0",
+  "private": true,
+  "description": "QueueKit — Redis + BullMQ playground (monorepo)",
+  "workspaces": [
+    "packages/*",
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "postinstall": "npm run build:packages",
+    "build:packages": "npm run build -w @queuekit/shared && npm run build -w @queuekit/redis-toolkit && npm run build -w @queuekit/queue-toolkit",
+    "build:backend": "npm run build:packages && npm run build -w @queuekit/api",
+    "build:frontend": "npm run build -w @queuekit/web",
+    "build": "npm run build:backend && npm run build:frontend",
+    "dev:backend": "npm run dev -w @queuekit/api",
+    "dev:frontend": "npm run dev -w @queuekit/web",
+    "start:backend": "npm run start:prod -w @queuekit/api",
+    "start:backend:dev": "npm run start -w @queuekit/api",
+    "test:backend": "npm run test -w @queuekit/api",
+    "test:frontend": "npm run test -w @queuekit/web",
+    "test": "npm run test:backend && npm run test:frontend",
+    "typecheck": "npm run typecheck -w @queuekit/shared && npm run typecheck -w @queuekit/redis-toolkit && npm run typecheck -w @queuekit/queue-toolkit && npm run typecheck -w @queuekit/api && npm run typecheck -w @queuekit/web",
+    "lint": "npm run lint -w @queuekit/api && npm run lint -w @queuekit/web"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "npm@10.9.2",
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  }
+}

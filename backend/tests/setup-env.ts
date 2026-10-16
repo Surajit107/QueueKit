@@ -1,0 +1,14 @@
+process.env.NODE_ENV = "test";
+process.env.PORT = "8000";
+process.env.QUEUEKIT_API_HOST_URL = "http://localhost:8000";
+process.env.CORS_ORIGIN = "http://localhost:3000";
+process.env.REDIS_URL = "redis://127.0.0.1:6379";
+process.env.REDIS_KEY_PREFIX = "queuekit:demo:";
+process.env.BODY_SIZE_LIMIT = "16kb";
+process.env.RATE_LIMIT_WINDOW_MS = "900000";
+process.env.RATE_LIMIT_MAX = "500";
+process.env.JOB_RATE_LIMIT_WINDOW_MS = "60000";
+process.env.JOB_RATE_LIMIT_MAX = "20";
+process.env.RESET_RATE_LIMIT_WINDOW_MS = "900000";
+process.env.RESET_RATE_LIMIT_MAX = "5";
+process.env.RUN_WORKER = "false";
